@@ -1,0 +1,88 @@
+#!/bin/bash
+# PE, 09/16/2009, fixed for vasp5
+
+if [ "$#" -lt 1 -o "$#" -gt 3 ] ; then
+    echo "usage: `basename $0` <infile> [<spin> [<selcycle>]]" > /dev/stderr
+    exit
+fi
+
+infile=$1 ; shift
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+spin=$1 ; shift
+selcycle=$1 ; shift
+
+nkpts=`grep -a NKPTS $infile \
+          | awk '{ for (i=1;i<=NF;i++) if ($(i)=="NKPTS") print $(i+2)}'`
+nbands=`grep -a NBANDS $infile \
+          | awk '{ for (i=1;i<=NF;i++) if ($(i)=="NBANDS=") print $(i+1)}'`
+
+echo "# nkpts= $nkpts"
+echo "# nbands= $nbands"
+
+awk \
+-v nkpts=$nkpts \
+-v nbands=$nbands \
+-v spin="$spin" \
+-v selcycle="$selcycle" \
+'BEGIN{
+  spin*=1;
+  selcycle*=1;
+  ikpt=0;
+  kxo=kyo=kzo=0;
+  cycle=0;
+}
+{
+  if ($1=="spin" && $2=="component") isp=$3;
+
+  if ($1=="E-fermi") cycle++;
+  if (cycle>selcycle && selcycle>0) { cycle--; exit; }
+
+  if (cycle>0 && $1=="k-point" && (spin==0 || spin==isp) ) {
+
+    ikpt=$2; kx[ikpt]=$4; ky[ikpt]=$5; kz[ikpt]=$6;
+    dkx=kx[ikpt]-kxo; dky=ky[ikpt]-kyo; dkz=kz[ikpt]-kzo;
+    dk=sqrt(dkx^2+dky^2+dkz^2);
+    k[ikpt]=k[ikpt-1]+dk;
+    kxo=kx[ikpt]; kyo=ky[ikpt]; kzo=kz[ikpt];
+
+    getline;
+
+    for (i=1;i<=nbands;i++) {
+      getline;
+      iband=$1;
+      ev[ikpt,iband]=$2;
+      occ[ikpt,iband]=$3;
+    }
+
+  }
+}
+END{
+
+  print "# band structure data";
+  print "# nkpts =",nkpts;
+  print "# nbands=",nbands;
+  print "# spin=",spin;
+  print "# selcycle=",selcycle;
+  print "# cycle=",cycle;
+  print "# 1st col: k-point index";
+  print "# 2nd col: effective k-point length";
+  print "# 3rd-5th col: k-point coordinates";
+  print "# 6th-7th col: eigenvalue and occupation for band #1";
+  print "# 8th-9th col: eigenvalue and occupation for band #2";
+  print "# 10th-12th col: eigenvalue and occupation for band #3";
+  print "# etc.";
+    
+  for (ikpt=1;ikpt<=nkpts;ikpt++) {
+    printf("%d %9.6f %9.6f %9.6f %9.6f",
+	   ikpt, k[ikpt], kx[ikpt], ky[ikpt], kz[ikpt]);
+    for (iband=1;iband<=nbands;iband++) {
+      printf(" %9.6f %9.6f", ev[ikpt,iband], occ[ikpt,iband]);
+    }
+    printf("\n");
+  }
+
+}' $infile
+

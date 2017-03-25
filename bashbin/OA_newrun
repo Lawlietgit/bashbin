@@ -1,0 +1,186 @@
+#!/bin/bash
+
+if [ "$#" -ne 4 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <name_new_dir> <# of nodes> <simulation type> <use final/initial posvel? Y/n>" > /dev/stderr
+	echo "# simulation type:"
+	echo "# 1 - normal minimization: cp_wave_min/initial/gen_wave"
+	echo "# 2 - normal cp_initial: cp/initial/restart_pos"
+	echo "# 3 - normal cp_restart: cp/restart_posvel/restart_posvel"
+	echo "# 4 - pi minimization: cp_wave_min_pimd/initial/gen_wave"
+	echo "# 5 - pi cp_initial: cp_pimd/initial/restart_pos"
+	echo "# 6 - pi cp_restart: cp_pimd/restart_posvel/restart_posvel"
+    echo "Set up new runs for OA, high<nodes>.pbs, debug<nodes>.pbs, tidy must be stored in FILE_DIR!" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+if [ $3 != 1 -a $3 != 2 -a $3 != 3 -a $3 != 4 -a $3 != 5 -a $3 != 6 ]; then
+	echo "Invalid selection of simulation type! Exiting ..."
+	exit
+fi
+
+if [ $4 != 'Y' -a $4 != 'y' -a $4 != 'N' -a $4 != 'n' ]; then
+	echo "Wrong selection of using final/initial posvel (Y/n)?"
+	exit
+fi
+
+FILE_DIR=/u/sciteam/li5/OAinputDONOTMOVE
+
+outdir=$1
+nodes=$2
+
+rm -rf $outdir
+mkdir $outdir
+echo "Copying pseudopotential files to $outdir/"
+cp Parms PPs def_files -r $outdir
+cp $FILE_DIR/tidy $outdir
+echo "Copying cpaimd_config.n$nodes files to $outdir/, MUST have the right config file here!!!"
+cp cpaimd_config.n$nodes INCAR $outdir
+cd $outdir
+	mkdir ATOM_COORDS_IN ATOM_COORDS_OUT STATES STATES_OUT
+cd ..
+
+cd ATOM_COORDS_OUT
+	for dir in *
+		do	echo "Creating dummy directories for ATOM_COORDS_OUT/ ..."
+	    	mkdir ../$outdir/ATOM_COORDS_OUT/$dir
+	done
+cd ..
+ 
+cd STATES_OUT
+	for dir in *
+		do	echo "Creating dummy directories for STATES_OUT/ ..."
+	    	mkdir ../$outdir/STATES_OUT/$dir
+	done
+cd ..
+
+if [ $3 = 1 -o $3 = 4 ]; then
+	cp $FILE_DIR/debug$nodes.pbs $outdir
+	cd $outdir
+		sed -e "s|.*num_time_step.*|        \\\\num_time_step{100000}|"  \
+			-e "s|.*\\\\restart_type.*|        \\\\restart_type{initial}|" \
+			-e "s|.*\\\\cp_restart_type.*|        \\\\cp_restart_type{gen_wave}|" INCAR > INCAR.tmp
+		if [ $3 = 1 ]; then
+			echo "Preparing cp_wave_min rerun in directory: $outdir" 
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp_wave_min}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv debug$nodes.pbs  cmin\_$outdir.pbs
+		else
+			echo "Preparing cp_wave_min_pimd rerun in directory: $outdir"
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp_wave_min_pimd}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv debug$nodes.pbs  cminPI\_$outdir.pbs
+		fi
+	cd ..     
+
+	echo "Creating dummy directories for STATES/ ..."
+	cd STATES_OUT
+		for dir in *
+			do  mkdir ../$outdir/STATES/$dir
+		done
+	cd ..
+
+	if [ $4 = 'Y' -o $4 = 'y' ]; then
+		cd ATOM_COORDS_OUT
+			for dir in *
+				do	echo "Creating dummy directories for ATOM_COORDS_IN/ ..."
+			    	mkdir ../$outdir/ATOM_COORDS_IN/$dir
+					echo "Feeding ATOM_COORDS_OUT/$dir CONTCAR to $outdir/ATOM_COORDS_IN/$dir, Converted by OA_CONT2POS! ..."
+					OA_CONT2POS $dir/CONTCAR > ../$outdir/ATOM_COORDS_IN/$dir/POSCAR
+			done
+		cd ..
+	elif [ $4 = 'N' -o $4 = 'n' ]; then
+		cd ATOM_COORDS_IN
+			for dir in *
+				do	echo "Creating dummy directories for ATOM_COORDS_IN/ ..."
+			    	mkdir ../$outdir/ATOM_COORDS_IN/$dir
+					echo "Feeding ATOM_COORDS_IN/$dir coords to $outdir/ATOM_COORDS_IN/$dir"
+					cp $dir/POSCAR ../$outdir/ATOM_COORDS_IN/$dir/POSCAR
+			done
+		cd ..
+	fi
+
+elif [ $3 = 2 -o $3 = 5 ]; then
+	cp $FILE_DIR/debug$nodes.pbs $outdir
+	cd $outdir
+		sed -e "s|.*num_time_step.*|        \\\\num_time_step{1000}|"  \
+			-e "s|.*\\\\restart_type.*|        \\\\restart_type{initial}|" \
+			-e "s|.*\\\\cp_restart_type.*|        \\\\cp_restart_type{initial}|" INCAR > INCAR.tmp
+		if [ $3 = 2 ]; then
+			echo "Preparing cp_initial rerun in directory: $outdir"
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv debug$nodes.pbs  cpini\_$outdir.pbs
+		else
+			echo "Preparing cp_initial_pimd rerun in directory: $outdir"
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp_pimd}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv debug$nodes.pbs  cpiniPI\_$outdir.pbs
+		fi
+	cd ..     
+
+	echo "Copying STATES_OUT/ to $outdir/STATES/"
+	rm -rf $outdir/STATES
+	cp -r STATES_OUT $outdir/STATES
+
+	if [ $4 = 'Y' -o $4 = 'y' ]; then
+		echo "cp_initial runs should always restart from cp_wave_min generated STATES/ with the same POSCAR!"
+		exit
+	elif [ $4 = 'N' -o $4 = 'n' ]; then
+		cd ATOM_COORDS_IN
+			for dir in *
+				do	echo "Creating dummy directories for ATOM_COORDS_IN/ ..."
+			    	mkdir ../$outdir/ATOM_COORDS_IN/$dir
+					echo "Feeding ATOM_COORDS_IN/$dir coords to $outdir/ATOM_COORDS_IN/$dir"
+					cp $dir/POSCAR ../$outdir/ATOM_COORDS_IN/$dir/POSCAR
+			done
+		cd ..
+	fi
+
+else
+	cp $FILE_DIR/high$nodes.pbs $outdir
+	cd $outdir
+		sed -e "s|.*num_time_step.*|        \\\\num_time_step{100000}|"  \
+			-e "s|.*\\\\restart_type.*|        \\\\restart_type{restart_posvel}|" \
+			-e "s|.*\\\\cp_restart_type.*|        \\\\cp_restart_type{restart_posvel}|" INCAR > INCAR.tmp
+		if [ $3 = 3 ]; then
+			echo "Preparing cp_restart rerun in directory: $outdir"
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv high$nodes.pbs  cpres\_$outdir.pbs
+		else
+			echo "Preparing cp_restartPI rerun in directory: $outdir"
+			rm INCAR
+			sed -e "s|.*simulation_typ.*|        \\\\simulation_typ{cp_pimd}|" INCAR.tmp > INCAR
+			rm INCAR.tmp
+			mv high$nodes.pbs  cpresPI\_$outdir.pbs
+		fi
+	cd ..     
+
+	echo "Copying STATES_OUT/ to $outdir/STATES/"
+	rm -rf $outdir/STATES
+	cp -r STATES_OUT $outdir/STATES
+
+	if [ $4 = 'N' -o $4 = 'n' ]; then
+		echo "cp_restart runs should always restart from cp_initial generated STATES/ and POSCAR, POSTRCAR, VELTRCAR files!"
+		exit
+	elif [ $4 = 'Y' -o $4 = 'y' ]; then
+		cd ATOM_COORDS_OUT
+			for dir in *
+				do	echo "Creating dummy directories for ATOM_COORDS_IN/ ..."
+			    	mkdir ../$outdir/ATOM_COORDS_IN/$dir
+					echo "Feeding ATOM_COORDS_OUT/$dir CONTCAR to $outdir/ATOM_COORDS_IN/$dir POSCAR ..."
+					cp $dir/CONTCAR  ../$outdir/ATOM_COORDS_IN/$dir/POSCAR
+					cp $dir/POSTRCAR  ../$outdir/ATOM_COORDS_IN/$dir/POSTRCAR
+					cp $dir/VELTRCAR  ../$outdir/ATOM_COORDS_IN/$dir/VELTRCAR
+			done
+		cd ..
+	fi
+fi
+

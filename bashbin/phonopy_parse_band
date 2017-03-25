@@ -1,0 +1,6 @@
+#!/bin/bash
+
+distance=`grep distance band.yaml|awk '{printf "%7.6f \n",$2}'`
+echo $distance > distance.dat
+frequency=`grep frequency band.yaml|awk '{printf "%12.6f \n",$2}'`
+echo $frequency > frequency.dat

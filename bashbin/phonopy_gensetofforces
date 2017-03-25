@@ -1,0 +1,23 @@
+#!/bin/bash
+if [ "$#" -lt 1 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <systemName>" > /dev/stderr
+    echo "generate initial phonopy runs" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+phonopy -d --dim="1 1 1"
+name=$1
+echo $name
+for dir in POSCAR-*
+do  echo $dir
+	rm -r $name\_$dir
+	mkdir $name\_$dir
+	cp $dir KPOINTS gen.sub POTCAR INCAR $name\_$dir
+	cd $name\_$dir
+	mv $dir POSCAR
+	mv gen.sub $name\_$dir.sub
+	qsub $name\_$dir.sub
+	sleep 1;
+	cd ..
+done

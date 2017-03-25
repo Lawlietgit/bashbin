@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ "$#" -lt 1 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <directioin>" > /dev/stderr
+    echo "extract the result of acell test of abinit x=1 y=2 z=3" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+kd=$1
+
+nset=`grep "ndtset" *.out|head -1|awk '{print $2}'`
+echo -e "ndtset = $nset"
+grep "acell" *.out|tail -$nset|awk -v kd=$kd '{printf "%6.3f\n",$(kd+1)}' > acell.dat
+grep ">Total energy" *.out|awk {'printf "%12.7f\n",$6'} > E.dat
+paste acell.dat E.dat > acelltest.dat
+rm acell.dat E.dat

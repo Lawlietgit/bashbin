@@ -1,0 +1,8 @@
+#!/bin/bash
+nset=`grep "ndtset" *.out|head -1|awk {'print $2'}`
+echo -e "ndtset = $nset"
+grep "       ecut" *.out|head -$nset|awk {'printf "%8.1f\n",$2*27.211383'} > ecut.dat
+grep "       ecut" *.out|head -$nset|awk {'printf "%8.1f\n",$2'} > har.dat
+grep ">Total energy" *.out|awk {'printf "%12.7f\n",$6'} > E.dat
+paste ecut.dat har.dat E.dat > ecuttest.dat
+rm ecut.dat har.dat E.dat

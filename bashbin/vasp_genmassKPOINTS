@@ -1,0 +1,60 @@
+#!/bin/bash
+
+if [ "$#" -lt 5 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <Cartesian KPC.dat> <delta> <kx> <ky> <kz>" > /dev/stderr
+    echo "    generate KPOINTS for effective mass caculations from chg KPC.dat " > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1 ;
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+#echo "infile = $infile"
+
+line=`wc $infile|awk '{print $1}'`
+#echo $line
+
+# Daniel's fancy way of figuring out whether something is numerical or not
+#        if ( $1 !~ /^[0-9]*$/ ) { ... }
+
+delta=$2
+kx=$3
+ky=$4
+kz=$5
+awk \
+-v line=$line -v d=$delta -v kx=$kz -v ky=$ky -v kz=$kz \
+'BEGIN{
+	for (i=1;i<=line;i++) {
+		getline;
+		x=$1;  y=$2;  z=$3; w = $4;
+		xn[i] = x;
+		yn[i] = y;
+		zn[i] = z;
+		wn[i] = w;
+	    }
+	kxp = kx + d;
+	kxm = kx - d;
+	kyp = ky + d;
+	kym = ky - d;
+	kzp = kz + d;
+	kzm = kz - d;
+}
+END{
+    if (line<=0) exit;
+    print "KPOINTS-mass"
+    print line+7;
+    print "C"
+    for (i=1;i<=line;i++) printf("%15.8f  %15.8f  %15.8f  %15.8f\n", xn[i], yn[i], zn[i], wn[i]);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kx , ky, kz, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kxm , ky, kz, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kxp , ky, kz, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kx , kym, kz, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kx , kyp, kz, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kx , ky, kzm, 0);
+    printf("%15.8f  %15.8f  %15.8f  %15.8f\n", kx , ky, kzp, 0);
+}' $infile

@@ -1,0 +1,7 @@
+#!/bin/bash
+rm -f lat.dat;
+rm -f coo.dat;
+more POSCAR|head -5|tail -3|awk '{print $0}' > lat.dat;
+a=$1;
+echo $a;
+more CONTCAR|grep "Direct" -A$a|tail -$a|awk '{print $0}' > coo.dat;

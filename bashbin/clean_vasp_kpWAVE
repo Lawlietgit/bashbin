@@ -1,0 +1,3 @@
+#!/bin/bash
+rm -f *.sub.o* CHG CHGCAR DOSCAR OSZICAR OUTCAR PCDAT XDATCAR stdout vasprun.xml EIGENVAL IBZKPT PROCAR
+

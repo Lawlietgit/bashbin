@@ -1,0 +1,6 @@
+#!/bin/bash
+echo -n 'who you want to talk to:
+'
+read value
+kk=`who|grep $value|tail -1|awk {'print $2'}`
+write $value $kk

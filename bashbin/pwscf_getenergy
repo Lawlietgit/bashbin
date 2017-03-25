@@ -1,0 +1,2 @@
+#!/bin/bash
+for dir in d2 d3 d4 d5 d6 d7 d8;do cd $dir;grep '!    total e' *.out;cd ..;done|awk '{printf "%12.7f\n", $5}'

@@ -1,0 +1,11 @@
+#!/bin/bash
+rm -f *.dat
+nk=`grep 'NKPTS' OUTCAR |awk '{print $4}'`
+echo nk=$nk
+line=`echo $nk+1|bc -l`
+
+grep 'Following reci' OUTCAR -A $line|tail -$nk > KPK.dat
+grep 'Following cart' OUTCAR -A $line|tail -$nk > KPC.dat
+grep 'reciprocal lattice v' OUTCAR -A 3|tail -3|awk '{print $4,$5,$6}' > kv.dat
+
+

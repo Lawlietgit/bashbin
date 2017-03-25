@@ -1,0 +1,23 @@
+#!/bin/sh
+
+if [ "$#" -lt 2 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile> <number of omega points>" > /dev/stderr
+    echo "extract frequency dependent dielectric function" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+kk=`echo $2+2|bc -l`
+
+grep -$kk 'REAL DIE' $infile |tail -$2|awk '{printf "%10.4f %10.4f %10.4f %10.4f\n",$1,$2,$3,$4}' > epsreal.dat
+
+grep -$kk 'IMAGINA' $infile |tail -$2|awk '{printf "%10.4f %10.4f %10.4f %10.4f\n",$1,$2,$3,$4}' > epsimag.dat
+
+#grep 'dielectric  constant' $infile |tail -$2|awk '{printf "%10.4f \n", $1}'

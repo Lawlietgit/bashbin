@@ -1,0 +1,27 @@
+#!/bin/bash
+if [ "$#" -ne 4 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <filesource> <filetarget> <line1> <line2>" > /dev/stderr
+    echo "switch two lines of a file" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+filename=$1
+filet=$2
+line1=$3
+line2=$4
+
+echo -e "lines to switch: \n"
+l1=`more $filename| \
+	awk -v line1=$line1 '{if(NR==line1) print $0}'`
+echo line$line1 = $l1
+l2=`more $filename| \
+	awk -v line2=$line2 '{if(NR==line2) print $0}'`
+echo line$line2 = $l2
+echo -e "\n"
+
+sed -e "$line1 a $l2" \
+    -e "$line1 d" \
+    -e "$line2 a $l1" \
+    -e "$line2 d" $filename > $filet

@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ] ; then
+    echo "usage: `basename $0` <infile>" > /dev/stderr
+    echo "  determine the position of the highest occupied" > /dev/stderr
+    echo "  and the lowest unoccupied level; requires the" > /dev/stderr
+    echo "  output of 'vasp_extractkpts' as input." > /dev/stderr
+    echo "  use '--' to read from standard input" > /dev/stderr
+    exit
+fi
+
+infile=$1
+if [ $infile = "--" ] ; then
+    infile="/dev/stdin"
+elif [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+echo "# 1st col: k-point index"
+echo "# 2nd col: effective k-point length"
+echo "# 3rd-5th col: k-point coordinates"
+echo "# 6th, 7th col: energy and occupation of highest occupied level"
+echo "# 8th, 8th col: energy and occupation of lowest unoccupied level"
+awk \
+'{
+   if ($1!="#") {
+     printf("%s %s %s %s %s ",$1,$2,$3,$4,$5);
+     for (i=6;i<=NF;i+=2) {
+       E=$(i);
+       occ=$(i+1);
+       if (occ<0.5&&occ_old>0.5) print E_old,occ_old,E,occ;
+       E_old=E;
+       occ_old=occ;
+     }
+   }
+}' $infile
+

@@ -1,0 +1,8 @@
+#!/bin/csh -f
+'rm' -f tprod.gnu
+echo 'set yrange[-0.1:0.1]' >tprod.gnu
+echo 'set xrange[0:8]' >>tprod.gnu
+echo 'plot "tprod.1" using 1:2 with lines,"tprod.2" using 1:2 with lines, "tprod.3" using 1:2 with lines,0' >>tprod.gnu
+echo ' ' >>tprod.gnu
+echo 'pause -1 "******Press return to continue******"' >> tprod.gnu
+gnuplot tprod.gnu

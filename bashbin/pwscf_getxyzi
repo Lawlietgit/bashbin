@@ -1,0 +1,19 @@
+#!/bin/sh
+
+if [ "$#" -lt 1 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile>" > /dev/stderr
+    echo "convert a pwscf input file to a xyz file" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1 
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+nat=`grep nat $infile | awk '{printf "%4.0f", $3}'`
+grep nat $infile | awk '{printf "%4.0f\n", $3}'
+grep -A$nat ATOMIC_PO $infile | awk '{print $0}'

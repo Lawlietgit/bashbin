@@ -1,0 +1,164 @@
+#!/bin/bash
+# PE, 09/16/2009, fixed for vasp5
+
+if [ "$#" -ne 3 -a "$#" -ne 4 ] ; then
+    echo "usage: `basename $0` <doscar> <outcar> <outdir> [<Eshift>]" > /dev/stderr
+    echo "  use '--' to read from standard input" > /dev/stderr
+    exit
+fi
+
+doscar=$1 ; shift
+if [ $doscar = "--" ] ; then
+    doscar="/dev/stdin"
+elif [ ! -f $doscar ] ; then
+    echo "ERROR: DOSCAR file $doscar does not exist" > /dev/stderr
+    exit
+fi
+outcar=$1 ; shift
+if [ $outcar = "--" ] ; then
+    outcar="/dev/stdin"
+elif [ ! -f $outcar ] ; then
+    echo "ERROR: OUTCAR file $outcar does not exist" > /dev/stderr
+    exit
+fi
+outdir=$1 ; shift
+if [ ! -d $outdir ] ; then
+    mkdir $outdir >& /dev/null
+    if [ ! -d $outdir ] ; then
+	echo "ERROR: cannot create directory" > /dev/stderr
+	exit
+    fi
+fi
+
+Eshift=$1 ; shift
+if [ -z $Eshift ] ; then
+    Eshift=0
+fi
+echo "energy scale will be shifted by $Eshift"
+
+# create list of atom types
+elems=`grep TITEL $outcar | awk '{printf("%s\n",$(NF-1))}' \
+             | sed 's/_/ /' | awk '{ printf("%d_%s ", ++i, $1) }'`
+nats=`grep "ions per type =" $outcar \
+        | awk '{ for (i=5;i<=NF;i++) printf(" %s", $(i)) }'`
+ispin=`grep ISPIN $outcar | awk '{print $3}'`
+echo "ispin= $ispin"
+echo "elems= $elems"
+echo "nats= $nats"
+
+# source code from main.F that writes the DOSCAR header
+#WRITE(16,'(4I4)') T_INFO%NIONP,T_INFO%NIONS,JOBPAR_,WDES%NCDIJ
+#WRITE(16,'(5E15.7)')AOMEGA,((LATT_CUR%ANORM(I)*1E-10),I=1,3),DYN%POTIM*1E-15
+#WRITE(16,*) DYN%TEMP
+#WRITE(16,*) ' CAR '
+#WRITE(16,*) INFO%SZNAM1
+# source code from main.F that writes the DOS energy range line
+#WRITE(16,'(2F16.8,I5,2F16.8)') KPOINTS%EMAX,KPOINTS%EMIN,NEDOS,EFERMI,1.0
+# source code from main.F that writes the standard DOS
+#WRITE(16,7062) EN,(DDOS(I,ISP)/DYN%KBLOCK,
+#            ISP=1,WDES%ISPIN),(DDOSI(I,ISP)/DYN%KBLOCK,ISP=1,WDES%ISPIN)
+
+# split DOSCAR file
+awk \
+    -v elems="$elems" \
+    -v nats="$nats" \
+    -v outdir=$outdir \
+  'BEGIN{
+
+     stderr="/dev/stderr";
+
+     ntype=split(elems,elem);
+     ntype2=split(nats,nat);
+     if (ntype!=ntype2) {
+       print "ERROR: ntype does not equal ntype2:",
+             ntype,ntype2 > stderr;
+       exit(1);
+     }
+
+     nattot=0; for (i=1;i<=ntype;i++) nattot+=nat[i];
+     for (i=1;i<=nattot;i++) {
+       k=0; j=0; while (i>k && ++j<=ntype) k+=nat[j];
+       type[i]=elem[j];
+     }
+
+     pass=0;
+
+   }
+   {
+
+     if ($1=="CAR") { getline; getline; pass=1; iat=-1; }
+
+     if (pass>0) {
+       if (iat==-1) {
+         iat++;
+         outfile=outdir"/DOSCAR.tot";
+       } else {
+         iat++;
+         outfile=outdir"/DOSCAR."type[iat]"_"iat;
+       }
+       print "outfile=",outfile,iat > stderr;
+
+       Emax=$1;
+       Emin=$2;
+       nE=$3;
+       Efermi=$4;
+
+       if (NR<8) {
+         print "Emin=",Emin > stderr;
+         print "Emax=",Emax > stderr;
+         print "nE=",nE > stderr;
+         print "Efermi=",Efermi > stderr;
+       }
+
+       for (i=1;i<=nE;i++) {
+         getline;
+         print > outfile;
+       }
+
+     }
+
+   }' $doscar
+
+# check consistency and sum up atoms of the same type
+for type in $elems ; do
+    awk \
+        '{
+          if (FNR==1) nat++;
+          enmax=(FNR>enmax?FNR:enmax);
+          NFmax=(NF>NFmax?NF:NFmax);
+          en[FNR]=$1;
+          for (i=2;i<=NF;i++) c[FNR,i]+=$(i)
+        }
+        END{
+          for (i=1;i<=enmax;i++) {
+            printf("%f",en[i]);
+            tot=0;
+            for (j=2;j<=NFmax;j++) tot+=c[i,j];
+            for (j=2;j<=NFmax;j++) printf(" %f",c[i,j]);
+            printf(" %f\n",tot)
+          }
+        }' $outdir/DOSCAR.${type}_* > $outdir/pdos.${type}
+done
+
+# add header and shift the energy scale
+tmpfile=mytmp.dos
+for file in $outdir/DOSCAR.* $outdir/pdos.* ; do
+    echo "# 1st col: energy (eV)" > $tmpfile
+    echo "# 2nd col: partial DOS, s-orbitals" >> $tmpfile
+    echo "# 3rd-5th col: partial DOS, p-orbitals" >> $tmpfile
+    echo "# 6th-10th col: partial DOS, d-orbitals" >> $tmpfile
+    echo "# 11th-17th col: partial DOS, f-orbitals (optional)" >> $tmpfile
+    echo "# Eshift= $Eshift" >> $tmpfile
+    if [ `basename $file | awk '{print (substr($1,1,4)=="pdos"?1:0)}'` -eq 1 ] ; then
+	echo "# 11th/18th col: partial DOS, sum over all orbitals" >> $tmpfile
+    fi
+    awk \
+	-v Eshift=$Eshift \
+	'{
+           printf("%.6f",$1-Eshift);
+           for (i=2;i<=NF;i++) printf(" %s",$(i));
+           printf("\n");
+        }' $file >> $tmpfile
+    mv $tmpfile $file
+done
+

@@ -1,0 +1,9 @@
+#!/bin/bash
+nk=`grep nkpt *DDB|head -1|awk {'print $2'}`
+echo nk=$nk
+nks=`echo $nk-1|bc -l`
+grep "   kpt " -A$nks *DDB|head -1|awk {'printf "%13.9f %13.9f %13.9f\n", $2, $3, $4'} > kpt1.dat
+grep "   kpt " -A$nks *DDB|head -$nk|tail -$nks|awk {'printf "%13.9f %13.9f %13.9f\n", $1, $2, $3'} > kptr.dat
+cat kpt1.dat kptr.dat > kpt.dat
+rm -f kpt1.dat kptr.dat
+

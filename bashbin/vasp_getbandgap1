@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ] ; then
+    echo "usage: `basename $0` <infile>" > /dev/stderr
+    echo "  use '--' to read from standard input" > /dev/stderr
+    exit
+fi
+
+infile=$1
+if [ $infile = "--" ] ; then
+    infile="/dev/stdin"
+elif [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+tmpfile=mytmp_`echo $file | sed 's;/;_;g'`_`date +'%s'`
+#vasp_extractkpts $infile 2 1| vasp_getVBCBmax -- > $tmpfile
+vasp_extractkpts $infile 2 1| vasp_getVBCBmax -- >> $tmpfile
+vasp_extractkpts $infile 1 1| vasp_getVBCBmax -- >> $tmpfile
+
+EVBM=`awk '$1>=1' $tmpfile | sort -rgk6 | head -1 | awk '{print $6}'`
+ECBM=`awk '$1>=1' $tmpfile | sort -gk8  | head -1 | awk '{print $8}'`
+printf "EVBM= %.3f\n" $EVBM
+printf "ECBM= %.3f\n" $ECBM
+printf "EG= %.3f\n" `echo $ECBM $EVBM | awk '{print $1-$2}'`
+rm -f $tmpfile
+

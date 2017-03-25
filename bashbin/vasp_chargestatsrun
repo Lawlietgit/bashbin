@@ -1,0 +1,66 @@
+#!/bin/bash
+if [ "$#" -ne 3 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <system name> <positive charge range> <negative charge range>" > /dev/stderr
+    echo "create runs for different charge states" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+p=$2
+n=$3
+system=$1
+
+NE=`grep NELECT OUTCAR| \
+	awk '{ print $3}'`
+
+echo "number of electrons in current directory = $NE"
+
+if [ $p -gt 0 ]; then
+   for i in `seq 1 1 $p`
+	do rm -rf $i
+	   echo "creating directory for charge state: p$i"
+           vasp_newrun p$i n n y
+	   cd p$i
+	   mv INCAR INCAR.t
+	   NEnew=`echo $NE-$i|bc -l`
+	   echo "number of electrons in p$i state = $NEnew"
+	   sed -e "/NELECT/d" \
+	       -e "5 a\ NELECT = $NEnew" INCAR.t > INCAR
+           rm -f INCAR.t
+           mv *.pbs $system\_p$i.pbs
+           qsub $system\_p$i.pbs
+           cd ..
+done
+fi
+
+if [ $n -gt 0 ]; then
+   for i in `seq 1 1 $n`
+	do rm -rf $i
+	   echo "creating directory for charge state: n$i"
+           vasp_newrun n$i n n y
+	   cd n$i
+	   mv INCAR INCAR.t
+	   NEnew=`echo $NE+$i|bc -l`
+	   echo "number of electrons in n$i state = $NEnew"
+	   sed -e "/NELECT/d" \
+	       -e "5 a\ NELECT = $NEnew" INCAR.t > INCAR
+           rm -f INCAR.t
+           mv *.pbs $system\_n$i.pbs
+           qsub $system\_n$i.pbs
+           cd ..
+done
+fi
+#echo -e "lines to switch: \n"
+#l1=`more $filename| \
+#	awk -v line1=$line1 '{if(NR==line1) print $0}'`
+#echo line$line1 = $l1
+#l2=`more $filename| \
+#	awk -v line2=$line2 '{if(NR==line2) print $0}'`
+#echo line$line2 = $l2
+#echo -e "\n"
+
+#sed -e "$line1 a $l2" \
+#    -e "$line1 d" \
+#    -e "$line2 a $l1" \
+#    -e "$line2 d" $filename

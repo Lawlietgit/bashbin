@@ -1,0 +1,20 @@
+#!/bin/sh
+
+if [ "$#" -lt 1 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile>" > /dev/stderr
+    echo "convert a pwscf output file to a xyz file" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1 
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+nat=`grep 'number of atoms' $infile | awk '{printf "%4.0f", $5}'`
+natp1=`echo $nat+1|bc -l`
+grep 'number of atoms' $infile | awk '{printf "%4.0f\n", $5}'
+grep -A$nat ATOMIC_PO $infile |tail -$natp1| awk '{print $0}'

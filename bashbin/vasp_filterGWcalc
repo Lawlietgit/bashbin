@@ -1,0 +1,77 @@
+#!/bin/bash
+# PE, 09/28/2010, 11/01/2010, 02/08/2011
+
+if [ "$#" -ne 2 -a "$#" -ne 3 ] ; then
+    echo "usage: `basename $0` <file> <iter> [<spin>]" > /dev/stderr
+    echo "  extracts energies and maximum forces from OUTCAR" > /dev/stderr
+    exit
+fi
+
+file=$1 ; shift
+if [ ! -f $file ] ; then
+    echo "ERROR: file $file does not exist" > /dev/stderr
+    exit
+fi
+iter=$1 ; shift
+if [ "$#" -gt 0 ] ; then
+    spin=$1 ; shift
+else
+    spin=-1
+fi
+
+echo "# 1st col: k-point index"
+echo "# 2nd-4th col: k-point coordinates"
+echo "# 5th col: band index"
+echo "# 6th col: initial eigen energy (eV)"
+echo "# 7th col: final QP energy (eV)"
+echo "# 8th col: change in QP energy during last iteration (eV)"
+echo "# 9th col: amplitude factor Z"
+echo "# 10th col: occupancy"
+
+ispin=` grep ISPIN  $file | awk '{print $3}'`
+nkpts=` grep NKPTS  $file | awk '{print $4}'`
+nbands=`grep NBANDS $file | awk '{print $15}'`
+grep -h -B3 -A`expr $nbands + 2` " QP-energies " $file \
+    | awk \
+-v nkpts=$nkpts \
+-v nbands=$nbands \
+-v iter=$iter \
+-v spin=$spin \
+-v ispin=$ispin \
+'BEGIN{
+  if (ispin==1) spin=-1;
+}{
+  if ($1" "$2=="spin component") {isp=$3; print isp,spin}
+  if ($1=="k-point") {
+    ik=$2;  kx[ik]=$4;  ky[ik]=$5;  kz[ik]=$6;
+    if (ik==1 && (spin==isp || spin<0)) niter++;
+    skip=0;
+  }
+  if (NF==0) skip++;
+  if ($1*1>0 && skip==1 && (spin==isp || spin<0)) {
+    ib=$1;
+    if (niter==1) EDFT[ib,ik]=$2;
+    if (niter==iter || iter<0) {
+      EGW[ib,ik]=$3;  Z[ib,ik]=$7;  occ[ib,ik]=$8;
+      EGWprev[ib,ik]=$2;
+      nbands_GW=ib;
+    }
+  }
+}END{
+  print "# spin=",spin;
+  print "# niter=",niter;
+  print "# nkpts=",nkpts;
+  print "# nbands=",nbands;
+  print "# nbands_GW=",nbands_GW;
+
+  for (ik=1;ik<=nkpts;ik++) {
+    print "";
+    for (ib=1;ib<=nbands_GW;ib++) {
+      dE=EGW[ib,ik]-EGWprev[ib,ik];
+      printf("%2d %8.4f %8.4f %8.4f %2d %8.4f %8.4f %8.4f %8.4f %8.4f\n",
+             ik, kx[ik], ky[ik], kz[ik], ib,
+             EDFT[ib,ik], EGW[ib,ik], dE, Z[ib,ik], occ[ib,ik]);
+    }
+  }
+}'
+

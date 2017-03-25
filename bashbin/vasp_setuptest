@@ -1,0 +1,11 @@
+#!/bin/bash
+rm -rf test
+mkdir test
+cd test
+cp ~/common/vasp/test/* .
+mkdir ENCUT kmesh
+cp kmesh.sub INCAR kmesh
+cp ENCUT.sub KPOINTS ENCUT
+cp ../{POTCAR,POSCAR} kmesh
+cp ../{POTCAR,POSCAR} ENCUT
+rm *.sub INCAR KPOINTS

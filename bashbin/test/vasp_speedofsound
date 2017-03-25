@@ -1,0 +1,33 @@
+#!/bin/sh
+
+if [ "$#" -lt 2 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile> <density (/cm^3)>" > /dev/stderr
+    echo "extract speed of sound from a OUTCAR file of an elastic run" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+
+infile=$1 
+rho=$2
+echo rho=$rho '('/cm^3')'
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+C11=`grep 'TOTAL ELASTIC MODULI' $infile -A3|tail -1| awk '{print $2}'`
+echo C11=$C11
+C12=`grep 'TOTAL ELASTIC MODULI' $infile -A3|tail -1| awk '{print $3}'`
+echo C12=$C12
+C44=`grep 'TOTAL ELASTIC MODULI' $infile -A6|tail -1| awk '{print $5}'`
+echo C44=$C44
+
+Cl=`echo sqrt'(''('C11+2*C12+4*C44')'/'('$rho/10000')'/3')'|bc -l`
+echo Cl=$Cl
+Ct=`echo sqrt'(''('C11+'('-1')'*C12+C44')'/'('$rho/10000')'/3')'|bc -l`
+echo Ct=$Ct
+
+Cs=`echo 3/'('2/$Ct+1/$Cl')'|bc -l`
+echo Cs=$Cs

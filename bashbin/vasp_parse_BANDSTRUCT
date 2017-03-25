@@ -1,0 +1,85 @@
+#!/bin/bash
+# PE, 06/08/2010
+
+if [ "$#" -ne 3 -a "$#" -ne 5 ] ; then
+    echo "usage: `basename $0` <infile> <ibmin> <ibmax> [<ikmin> <Eshift>]" > /dev/stderr
+    echo "  parses the output of 'vasp_extractkpts' to generate" > /dev/stderr
+    echo "  a format that is very simple to plot" > /dev/stderr
+    exit
+fi
+
+infile=$1 ; shift
+if [ $infile = "--" ] ; then
+    infile="/dev/stdin"
+elif [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+ibmin=$1  ; shift
+ibmax=$1  ; shift
+ikmin=$1  ; shift
+Eshift=$1 ; shift
+
+echo "# 1st col: k-point index"
+echo "# 2nd col: relative k-vector length"
+echo "# 3rd col: eigen energy (eV)"
+echo "# 4th col: occupation"
+echo "# 5th col: band index"
+echo "# 6th-8th col: k-point coordinate"
+echo "# 9th col: VB vs CB index that can be used for gnuplot coloring"
+
+awk \
+-v Eshift=$Eshift \
+-v ibmin=$ibmin \
+-v ibmax=$ibmax \
+-v ikmin=$ikmin \
+'BEGIN{
+  Eshift*=1.0;
+}{
+  if (substr($1,1,1)=="#" || NF==0) next;
+  nk++;
+  xk_full[nk]=$3;
+  yk_full[nk]=$4;
+  zk_full[nk]=$5;
+  dkx=xk_full[nk]-xko;
+  dky=yk_full[nk]-yko;
+  dkz=zk_full[nk]-zko;
+  dk=sqrt(dkx^2+dky^2+dkz^2);
+  xk[nk]=xk[nk-1]+dk;
+  xko=xk_full[nk]; yko=yk_full[nk]; zko=zk_full[nk];
+  nb=0;
+  for (i=6;i<=NF;i+=2) {
+    nb++;
+    if (nb>=ibmin && nb<=ibmax) {
+      E[nk,nb]=$(i)+Eshift;
+      occ[nk,nb]=$(i+1);
+    }
+  }
+}END{
+  ikmin*=1;
+  ikmin=(ikmin>0 ?ikmin:1);
+  ibmin=(ibmin>0 ?ibmin:1);
+  ibmax=(ibmax<nb?ibmax:nb);
+  print "# nb=",nb;
+  print "# nk=",nk;
+  print "# Eshift=",Eshift;
+  print "# ikmin=",ikmin;
+  print "# ibmin=",ibmin;
+  print "# ibmax=",ibmax;
+  print "";
+  xk0=xk[ikmin];
+  for (ib=ibmin;ib<=ibmax;ib++) {
+    for (ik=ikmin;ik<=nk;ik++) {
+      # this can be used for coloring the lines in gnuplot
+      col=3;
+      if (occ[ik,ib]>=1.9) col=1;
+      if (occ[ik,ib]<=0.1) col=2;
+      dxk=xk[ik]-xk0;
+      printf("%3d %8.5f %8.4f %7.4f  %3d  %8.4f %8.4f %8.4f  %1d\n",
+             ik, dxk, E[ik,ib], occ[ik,ib], ib,
+             xk_full[ik], yk_full[ik], zk_full[ik], col);
+    }
+    print "";
+  }  
+}' $infile
+

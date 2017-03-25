@@ -1,0 +1,25 @@
+#!/bin/sh
+
+if [ "$#" -lt 2 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile> <nbands>" > /dev/stderr
+    echo "extract energy vs nk from EIGENVAL or OUTCAR" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+nk=`grep 'NBANDS' OUTCAR |awk '{print $4}'`
+echo nk=$nk
+nbands=$2
+echo nbands=$nbands
+line=`echo $nbands-1|bc -l`
+
+grep '   1      ' $infile -A $line > tmp.dat
+sed 's/--//g' tmp.dat > res.dat
+rm -f tmp.dat

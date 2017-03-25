@@ -1,0 +1,70 @@
+#!/bin/sh
+
+if [ "$#" -lt 2 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <infile> <nat> <atm1> <atm2>" > /dev/stderr
+    echo "extract the torque acting on a dimer from a OUTCAR file" > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+
+infile=$1 
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+nat=$2
+
+atm1=$3
+
+atm2=$4
+
+natp1=`echo $nat | awk '{print $1+1}'`
+
+f1=`grep -A$natp1 TOTAL-F $infile | tail -$nat | \
+    awk -v atm1=$atm1 '{if(NR==atm1) print $4,$5,$6}'`
+f2=`grep -A$natp1 TOTAL-F $infile | tail -$nat | \
+    awk -v atm2=$atm2 '{if(NR==atm2) print $4,$5,$6}'`
+r1=`grep -A$natp1 TOTAL-F $infile | tail -$nat | \
+    awk -v atm1=$atm1  '{if(NR==atm1) print $1,$2,$3}'`
+r2=`grep -A$natp1 TOTAL-F $infile | tail -$nat | \
+    awk -v atm2=$atm2 '{if(NR==atm2) print $1,$2,$3}'`
+
+#echo "f1=" $f1 
+#echo "f2=" $f2 
+#echo "r1=" $r1 
+#echo "r2=" $r2
+
+f1av=`echo $f1 $f2 | awk '{print ($1-$4)/2, ($2-$5)/2, ($3-$6)/2}'`
+rcm=`echo $r1 $r2 | awk '{print ($1+$4)/2, ($2+$5)/2, ($3+$6)/2}'`
+
+r12=`echo $r1 $rcm | awk '{print ($1-$4), ($2-$5), ($3-$6)}'`
+
+d=`echo $r12 | awk '{print sqrt(($1*2)^2+($2*2)^2+($3*2)^2)}'`
+
+#echo "rcm=" $rcm
+#echo "r12=" $r12
+
+t=`echo $r12 $f1av | awk \
+'{
+  x=$1 
+  y=$2
+  z=$3
+  fx=$4 
+  fy=$5
+  fz=$6
+  tx=y*fz-z*fy
+  ty=z*fx-x*fz
+  tz=x*fy-y*fx
+  print tx, ty, tz
+  }'`
+
+echo $d $t 
+
+
+
+
+
+

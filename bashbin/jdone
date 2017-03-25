@@ -1,0 +1,2 @@
+#!/bin/bash
+find `pwd` -regex '.*\.o[0-9]+' -mmin -$((${1:-1}*1440)) -mmin +$((${2:-0}*1440)) -printf "%T+ %p\n"|sort -n|sed 's/[^/]*$//'|sed 's/^[^/]*//'

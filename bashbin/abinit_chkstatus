@@ -1,0 +1,64 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ] ; then
+    echo "usage: `basename $0` <OUTCAR_file> " > /dev/stderr
+    echo "  extracts energies and maximum forces from OUTCAR" > /dev/stderr
+    exit
+fi
+
+outcar=$1
+if [ ! -f $outcar ] ; then
+    echo "ERROR: file $outcar does not exist" > /dev/stderr
+    exit
+fi
+
+nions=`grep "natom" $outcar | tail -1 | awk '{print $2}'`
+isw=`grep " At SCF step " $outcar | wc | awk '{print $1}'`
+if [ ! $isw ] ; then
+    echo "ERROR: no finished iteration steps" > /dev/stderr
+    exit
+fi
+
+echo "# 1st col: iteration"
+echo "# 2nd col: number of SCF cycles"
+echo "# 3th col: energy without entropy (eV)"
+echo "# 4th col: change in total energy (eV)"
+echo "# 5th col: maximum force (meV/angstrom)"
+echo "# 6th-8th col: maximum force in x,y,z (meV/angstrom)"
+echo "# 9th col: id of atom with maximum force"
+
+mov=`grep ionmov *.out|head -1|awk '{printf("%2d",$6)}'`
+Eold=0
+for ((i=1;i<=$isw;i++)) ; do
+
+    ii=`echo $i | awk '{printf("%3d",$1)}'`
+
+    nscf=`grep " At SCF step " $outcar |head -$i| tail -1 | awk '{printf("%3d",$4)}'`
+    E=`grep "  iter   Etot" -m$i -A$nscf $outcar \
+           | tail -1 | awk '{printf("%14.6f\n",$3*27.21138505)}'`
+    dE=`echo $E $Eold | awk '{printf("%14.6f\n",$1-$2)}'`
+    Eold=$E
+	if [ $mov = 0 ] ;
+	then
+    fmax=`grep  -m1 -A$nions "cartesian forces" $outcar \
+          | tail -$nions \
+          | awk '{
+              fx=$2*51422.062; fy=$3*51422.062; fz=$4*51422.062;
+              f=sqrt((fx^2+fy^2+fz^2)/3);
+              printf("%7.1f  %7.1f %7.1f %7.1f  %3d\n", f, fx, fy, fz, NR)}' \
+          | sort -rnk1 | head -1`
+	else
+    fmax=`grep  -m$i -A$nions "Cartesian forces" $outcar \
+          | tail -$nions \
+          | awk '{
+              fx=$1*51422.062; fy=$2*51422.062; fz=$3*51422.062;
+              f=sqrt((fx^2+fy^2+fz^2)/3);
+              printf("%7.1f  %7.1f %7.1f %7.1f  %3d\n", f, fx, fy, fz, NR)}' \
+          | sort -rnk1 | head -1`
+	fi
+
+#   printf "$ii  $nscf  $E $dE $fmax  $favg \n"
+    printf "$ii  $nscf  $E $dE $fmax\n"
+
+done
+

@@ -1,0 +1,19 @@
+#!/bin/bash
+u=0
+for files in pdos.*
+	do  u=`echo $u+1|bc`
+	mv $files $files.kk
+done
+echo elements=$u
+for i in `seq 1 $u`
+	do  echo $i
+		rename pdos\.$i\_ '' pdos.$i_*
+done
+for filename in *.kk
+	do  sed '1,7d' $filename > $filename.dat
+done
+rename .kk '' *.dat 
+sed '1,6d' DOSCAR.tot > tot.dat
+rm -rf *.kk
+
+ 

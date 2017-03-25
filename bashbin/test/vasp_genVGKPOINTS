@@ -1,0 +1,50 @@
+#!/bin/bash
+
+if [ "$#" -lt 2 ] ; then
+    echo > /dev/stderr
+    echo "usage: `basename $0` <Cartesian KPC.dat> <delta>" > /dev/stderr
+    echo "    generate KPOINTS for VG caculations from chg KPC.dat " > /dev/stderr
+    echo > /dev/stderr
+    exit
+fi
+
+infile=$1 ;
+if [ ! -f $infile ] ; then
+    echo "ERROR: file $infile does not exist" > /dev/stderr
+    exit
+fi
+
+#echo "infile = $infile"
+
+line=`wc $infile|awk '{print $1}'`
+#echo $line
+
+# Daniel's fancy way of figuring out whether something is numerical or not
+#        if ( $1 !~ /^[0-9]*$/ ) { ... }
+
+delta=$2
+awk \
+-v line=$line -v d=$delta \
+'BEGIN{
+	for (i=1;i<=line;i++) {
+		getline;
+		x=$1;  y=$2;  z=$3; w = $4;
+		xn[i] = x;
+		yn[i] = y;
+		zn[i] = z;
+		wn[i] = w;
+		xd[i] = x+d;
+		yd[i] = y+d;
+		zd[i] = z+d;
+	    }
+}
+END{
+    if (line<=0) exit;
+    print "KPOINTS-VG"
+    print line*4;
+    print "C"
+    for (i=1;i<=line;i++) printf("%15.8f  %15.8f  %15.8f  %15.8f\n", xn[i], yn[i], zn[i], wn[i]);
+    for (i=1;i<=line;i++) printf("%15.8f  %15.8f  %15.8f  %15.8f\n", xd[i], yn[i], zn[i], 0);
+    for (i=1;i<=line;i++) printf("%15.8f  %15.8f  %15.8f  %15.8f\n", xn[i], yd[i], zn[i], 0);
+    for (i=1;i<=line;i++) printf("%15.8f  %15.8f  %15.8f  %15.8f\n", xd[i], yn[i], zd[i], 0);
+}' $infile
