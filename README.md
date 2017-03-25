@@ -1,2 +1,2 @@
 # bashbin
-bash scripts
+bash scripts for PWSCF, VASP, OA, BoltzTraP codes.
