@@ -1,0 +1,11 @@
+echo -n 'please input the prefix:
+'
+read pre
+for dir in $pre.*
+#for dir in LS.*
+do
+cd $dir
+echo $dir
+grep reached stdout
+cd ..
+done

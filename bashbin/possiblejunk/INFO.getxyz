@@ -1,0 +1,13 @@
+echo -n 'please input the prefix:
+'
+read pre
+echo -n 'please input the number of atoms:
+'
+read number
+for dir in $pre.*
+do
+nu=`echo $number+1|bc -l`
+f1=`grep -A$nu TOTAL-F $dir/OUTCAR | tail -$number| \
+    awk '{print $1,$2,$3}'`
+echo $f1 > $dir.xyz
+done

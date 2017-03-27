@@ -1,0 +1,5 @@
+#!/bin/bash
+mv t.dat t1.dat
+mv d.dat d1.dat
+tr '\n' '\t' < t1.dat > t.dat
+tr '\n' '\t' < d1.dat > d.dat
